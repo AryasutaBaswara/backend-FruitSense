@@ -1,0 +1,9 @@
+# File .env - MENGANDUNG KUNCI RAHASIA!
+.env
+
+# Folder dependencies Node.js
+/node_modules
+
+# Logs
+npm-debug.log*
+.DS_Store
