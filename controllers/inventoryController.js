@@ -1,4 +1,5 @@
 const supabase = require("../config/supabase");
+const { v4: uuidv4 } = require("uuid");
 
 const getExpirationDate = (days) => {
   const date = new Date();
@@ -10,40 +11,74 @@ const getExpirationDate = (days) => {
 exports.createInventory = async (req, res) => {
   const userId = req.userId;
   const { fruit_name, stock_quantity } = req.body;
+  const imageFile = req.file;
+
+  if (!fruit_name || !stock_quantity || !imageFile) {
+    return res
+      .status(400)
+      .json({ error: "Nama buah, kuantitas, dan gambar wajib diisi." });
+  }
+
+  let imageUrl = null;
+  const bucketName = "fruit-images";
+
+  try {
+    const fileExtension = imageFile.originalname.split(".").pop();
+    const uniqueFileName = `${uuidv4()}.${fileExtension}`;
+    const filePath = `${userId}/${uniqueFileName}`;
+
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, imageFile.buffer, {
+        contentType: imageFile.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    imageUrl = publicUrlData.publicUrl;
+  } catch (error) {
+    console.error("Supabase Storage Error:", error);
+    return res.status(500).json({
+      error: "Gagal mengupload gambar. Periksa konfigurasi Storage Anda.",
+    });
+  }
 
   // Dummy Data
   const mockGrade = "A";
   const mockNutrients = "Vitamin C";
   const mockExpirationDays = 7;
-
-  if (!fruit_name || !stock_quantity) {
-    return res
-      .status(400)
-      .json({ error: "fruit and stock should not empty!." });
-  }
+  const expirationDate = getExpirationDate(mockExpirationDays);
 
   const inventoryData = {
     user_id: userId,
+    image_url: imageUrl,
     fruit_name: fruit_name,
     grade: mockGrade,
     nutrients: mockNutrients,
-    expiration_date: getExpirationDate(mockExpirationDays),
+    expiration_date: expirationDate,
     stock_quantity: stock_quantity,
   };
 
-  const { data, error } = await supabase
+  const { data: insertData, error: insertError } = await supabase
     .from("inventories")
     .insert([inventoryData])
     .select("*");
 
-  if (error) {
-    console.error("Supabase Insert Error: ", error);
-    return res.status(500).json({ error: "Failed to add data to inventory." });
+  if (insertError) {
+    console.error("Database Insert Error, Cleaning up file:", insertError);
+    return res
+      .status(500)
+      .json({ error: "Gagal menambahkan stok inventory ke database." });
   }
 
-  res.status(200).json({
+  res.status(201).json({
     message: "Item berhasil ditambahkan ke inventory!",
-    item: data[0],
+    item: insertData[0],
   });
 };
 
