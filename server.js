@@ -2,7 +2,10 @@
 const express = require("express");
 const authRoutes = require("./routes/authRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
+
 const historyRoutes = require("./routes/historyRoutes");
+
+const { startScheduler } = require("./services/notificationScheduler");
 
 const app = express();
 const port = 8080;
@@ -18,4 +21,6 @@ app.use("/api/v1/history", historyRoutes);
 // SERVER RUNNING
 app.listen(port, () => {
   console.log(`Server Express berjalan di http://localhost:${port}`);
+
+  startScheduler();
 });
