@@ -1,5 +1,17 @@
 const supabase = require("../config/supabase");
 const { v4: uuidv4 } = require("uuid");
+const dayjs = require("dayjs");
+const customParseFormat = require("dayjs/plugin/customParseFormat");
+dayjs.extend(customParseFormat);
+
+const calculateDaysUntilExpired = (expirationDate) => {
+  // Diasumsikan expirationDate datang dari DB dalam format YYYY-MM-DD
+  const today = dayjs().startOf("day");
+  const expiry = dayjs(expirationDate).startOf("day");
+
+  // Mengembalikan nilai integer (positif, nol, atau negatif)
+  return expiry.diff(today, "days");
+};
 
 const getExpirationDate = (days) => {
   const date = new Date();
@@ -98,7 +110,16 @@ exports.getInventories = async (req, res) => {
       .json({ error: "Failed to fetch data from inventory." });
   }
 
-  res.status(200).json(data);
+  const processedData = data.map((item) => {
+    const daysLeft = calculateDaysUntilExpired(item.expiration_date);
+
+    return {
+      ...item,
+      days_until_expired: daysLeft,
+    };
+  });
+
+  res.status(200).json(processedData);
 };
 
 exports.updateInventory = async (req, res) => {
