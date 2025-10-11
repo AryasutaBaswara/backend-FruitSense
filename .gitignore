@@ -3,6 +3,7 @@
 
 # Folder dependencies Node.js
 /node_modules
+firebase-credentials.json
 
 # Logs
 npm-debug.log*
