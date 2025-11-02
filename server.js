@@ -21,7 +21,24 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/history", historyRoutes);
+app.get("/", (req, res) => {
+  // Kirim pesan konfirmasi yang jelas
+  res.send(
+    "<h1>Verifikasi Sukses!</h1><p>Akun Anda telah diaktifkan. Silakan kembali ke aplikasi mobile.</p>"
+  );
+});
 
+app.get("/reset-password", (req, res) => {
+  // Saat user mengklik link di email, token dikirim via URL query.
+  // Kita tangkap URL penuhnya di sini.
+  const resetUrl = req.protocol + "://" + req.get("host") + req.originalUrl;
+
+  res.send(`
+        <h1>Landing Page Reset Password (Simulasi)</h1>
+        <p>Token sudah ada di URL. Silakan salin URL di address bar dan lanjutkan di Postman.</p>
+        <p>Token Anda: <strong>${req.query.access_token}</strong></p>
+    `);
+});
 // SERVER RUNNING
 app.listen(port, () => {
   console.log(`Server Express berjalan di http://localhost:${port}`);
