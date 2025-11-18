@@ -7,6 +7,7 @@ const inventoryRoutes = require("./routes/inventoryRoutes");
 const userRoutes = require("./routes/userRoutes");
 
 const historyRoutes = require("./routes/historyRoutes");
+const analysisRoutes = require("./routes/analysisRoutes");
 
 const { startScheduler } = require("./services/notificationScheduler");
 
@@ -21,6 +22,7 @@ app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/history", historyRoutes);
+app.use("/api/v1/analyze", analysisRoutes);
 app.get("/", (req, res) => {
   // Kirim pesan konfirmasi yang jelas
   res.send(
@@ -42,6 +44,5 @@ app.get("/reset-password", (req, res) => {
 // SERVER RUNNING
 app.listen(port, () => {
   console.log(`Server Express berjalan di http://localhost:${port}`);
-
   startScheduler();
 });
