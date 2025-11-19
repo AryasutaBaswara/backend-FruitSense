@@ -105,7 +105,7 @@ exports.processLabels = async (predictedFruit, predictedGradeLabel) => {
     fruit_name: finalFruitName,
     grade: finalGrade,
     nutrients: finalNutrients,
-    expirationDays: expirationDays,
+    expiration_days: expirationDays,
     summary: `${finalFruitName} - ${finalGrade}. Contains: ${finalNutrients}.`,
   };
 };
