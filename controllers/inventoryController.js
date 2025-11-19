@@ -125,18 +125,27 @@ exports.getInventories = async (req, res) => {
 exports.updateInventory = async (req, res) => {
   const userId = req.userId;
   const inventoryId = req.params.id;
-  const { stock_quantity } = req.body;
+  const { stock_quantity, fruit_name } = req.body;
 
-  if (stock_quantity === undefined) {
+  if (stock_quantity === undefined && !fruit_name) {
     return res.status(400).json({ error: "Kuantitas stok wajib diisi." });
+  }
+
+  const updateData = {
+    updated_at: new Date().toISOString(),
+  };
+
+  if (stock_quantity !== undefined) {
+    updateData.stock_quantity = stock_quantity;
+  }
+
+  if (fruit_name) {
+    updateData.fruit_name = fruit_name;
   }
 
   const { data, error } = await supabase
     .from("inventories")
-    .update({
-      stock_quantity: stock_quantity,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq("id", inventoryId)
     .eq("user_id", userId)
     .select("*");
