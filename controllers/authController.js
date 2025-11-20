@@ -45,25 +45,64 @@ exports.loginUser = async (req, res) => {
     return res.status(400).json({ error: "Email dan password wajib diisi." });
   }
 
-  // Menggunakan supabase.auth.signInWithPassword()
-  const { data, error } = await supabase.auth.signInWithPassword({
-    email: email,
-    password: password,
-  });
-
-  if (error) {
-    console.error("Supabase Login Error:", error);
-    return res.status(401).json({
-      error: "Kredensial tidak valid atau pengguna belum dikonfirmasi.",
-    });
+  // validasi format email sederhana
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: "Email tidak valid." });
   }
 
-  // Mengembalikan token sesi (JWT) yang akan digunakan frontend untuk permintaan aman
-  res.status(200).json({
-    message: "Login berhasil.",
-    session: data.session, // Berisi access_token (JWT) dan refresh_token
-    user: data.user,
-  });
+  try {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email,
+      password: password,
+    });
+
+    if (error) {
+      console.error("Supabase Login Error:", error);
+
+      const msg = (error?.message || "").toString().toLowerCase();
+
+      // Deteksi error kredensial salah
+      if (
+        msg.includes("invalid") ||
+        msg.includes("wrong") ||
+        error?.status === 400
+      ) {
+        return res.status(401).json({ error: "Email atau password salah." });
+      }
+
+      // Deteksi kalau email belum terkonfirmasi
+      if (
+        msg.includes("confirm") ||
+        msg.includes("verification") ||
+        error?.status === 403
+      ) {
+        return res
+          .status(403)
+          .json({ error: "Email belum dikonfirmasi. Cek email Anda." });
+      }
+
+      // fallback untuk error lain
+      return res.status(500).json({ error: "Gagal login. Silakan coba lagi." });
+    }
+
+    if (!data || !data.session) {
+      return res
+        .status(500)
+        .json({ error: "Gagal membuat sesi. Silakan coba lagi." });
+    }
+
+    // sukses
+    res.status(200).json({
+      message: "Login berhasil.",
+      session: data.session,
+      user: data.user,
+    });
+  } catch (err) {
+    console.error("Unexpected login error:", err);
+    return res
+      .status(500)
+      .json({ error: "Terjadi kesalahan server saat login." });
+  }
 };
 
 exports.logoutUser = async (req, res) => {
@@ -78,124 +117,72 @@ exports.logoutUser = async (req, res) => {
 // controllers/authController.js (Koreksi Final untuk Self-Service Reset)
 
 exports.forgotPassword = async (req, res) => {
-  const { email } = req.body; // Hanya butuh email dari user
+  const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({ error: "Email wajib diisi." });
+  if (!email) return res.status(400).json({ error: "Email wajib diisi." });
+
+  // Ini akan kirim email berisi OTP (karena template sudah diubah)
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+  if (error) {
+    console.error("Forgot Password Error:", error.message);
+    // Tetap return 200 agar tidak bocor email mana yang terdaftar (Security Best Practice)
+    // Atau return 400/500 kalau mau eksplisit saat dev
+    return res.status(500).json({ error: "Gagal mengirim email." });
   }
 
-  // Panggil fungsi Supabase untuk mengirim email reset
-  // PERHATIAN: Ganti URL di redirectTo dengan URL halaman reset password di aplikasi/web Anda
-  // Jika tidak diisi, Supabase menggunakan default yang mungkin tidak bekerja.
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: "http://localhost:8080/reset-password", // <-- GANTI DENGAN URL ASLI!
+  res.status(200).json({
+    message: "Jika email terdaftar, kode OTP reset password telah dikirim.",
+  });
+};
+
+exports.verifyRecovery = async (req, res) => {
+  const { email, otp } = req.body;
+
+  if (!email || !otp) {
+    return res.status(400).json({ error: "Email dan kode OTP wajib diisi." });
+  }
+
+  // Verifikasi OTP tipe 'recovery' (khusus reset password)
+  const { data, error } = await supabase.auth.verifyOtp({
+    email: email,
+    token: otp,
+    type: "recovery",
   });
 
   if (error) {
-    console.error("Supabase Password Reset Error:", error);
-    // Mengembalikan error 500 karena masalah SMTP/koneksi
-    return res
-      .status(500)
-      .json({ error: "Gagal mengirim email reset password." });
+    return res.status(400).json({ error: "Kode OTP salah atau kadaluarsa." });
   }
 
-  // Respon yang aman: Beri tahu user untuk cek email (terlepas dari apakah akun terdaftar).
+  // PENTING: Ini akan mengembalikan SESSION (Token JWT)
+  // User dianggap "Login Sementara" untuk bisa ganti password
   res.status(200).json({
-    message:
-      "Jika akun terdaftar, email untuk reset password telah dikirimkan ke alamat Anda. Cek Mailtrap.",
+    message: "Kode valid! Silakan gunakan token ini untuk ganti password.",
+    session: data.session,
   });
 };
 
 exports.resetPasswordFinal = async (req, res) => {
-  // 1. Token Reset (Access Token) datang di Header Authorization
-  const authHeader = req.headers.authorization;
   const { new_password } = req.body;
 
-  if (!authHeader || !new_password || new_password.length < 6) {
-    return res.status(400).json({
-      error:
-        "Token otorisasi dan password baru minimal 6 karakter wajib diisi.",
-    });
+  // Ingat: User harus kirim Header Authorization: Bearer <TOKEN DARI LANGKAH 2>
+
+  if (!new_password || new_password.length < 6) {
+    return res.status(400).json({ error: "Password baru minimal 6 karakter." });
   }
 
-  // Token yang dikirim adalah token reset dari URL
-  const resetToken = authHeader.split(" ")[1];
+  // Fungsi updateUser otomatis pakai Token dari header
+  const { data, error } = await supabase.auth.updateUser({
+    password: new_password,
+  });
 
-  try {
-    // DEBUG: log token (hapus log ini di produksi)
-    console.log("Reset token (first 20 chars):", resetToken?.slice(0, 20));
-
-    // 1) Coba panggil SDK dengan beberapa bentuk argumen (tergantung versi SDK)
-    let updateResult;
-    try {
-      // bentuk modern: second arg sebagai opsi object (kadang { accessToken })
-      updateResult = await supabase.auth.updateUser(
-        { password: new_password },
-        { accessToken: resetToken }
-      );
-    } catch (sdkErr) {
-      // fallback: beberapa versi menerima token langsung sebagai second param
-      try {
-        updateResult = await supabase.auth.updateUser(
-          { password: new_password },
-          resetToken
-        );
-      } catch (e) {
-        // biarkan updateResult undefined untuk melakukan fallback REST
-        console.warn(
-          "SDK updateUser attempts failed:",
-          sdkErr?.message || sdkErr,
-          e?.message || e
-        );
-      }
-    }
-
-    // Jika SDK mengembalikan error, atau tidak tersedia, pakai REST API Supabase sebagai fallback
-    if (!updateResult || updateResult.error) {
-      // Fallback: PUT ke /auth/v1/user dengan Authorization: Bearer <resetToken>
-      const fetchImpl = global.fetch || require("node-fetch");
-      const supabaseUrl = process.env.SUPABASE_URL;
-      const anonKey = process.env.SUPABASE_ANON_KEY || process.env.SUPABASE_KEY;
-      const url = supabaseUrl.replace(/\/$/, "") + "/auth/v1/user";
-
-      const resp = await fetchImpl(url, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${resetToken}`,
-          apikey: anonKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ password: new_password }),
-      });
-
-      const respBody = await resp.text();
-      let parsed;
-      try {
-        parsed = JSON.parse(respBody);
-      } catch (_) {
-        parsed = respBody;
-      }
-
-      if (!resp.ok) {
-        console.error("REST reset failed:", resp.status, parsed);
-        throw new Error(
-          typeof parsed === "object" ? JSON.stringify(parsed) : String(parsed)
-        );
-      }
-    }
-
-    // 3. Response Sukses
-    res.status(200).json({
-      message:
-        "Password berhasil direset. Silakan login dengan password baru Anda.",
-    });
-  } catch (error) {
-    console.error("Final Reset Error Detailed:", error);
-    // Error sering terjadi jika token sudah kadaluarsa/salah
-    return res
-      .status(401)
-      .json({ error: "Reset gagal. Tautan kadaluarsa atau tidak valid." });
+  if (error) {
+    return res.status(500).json({ error: "Gagal mengganti password." });
   }
+
+  res.status(200).json({
+    message: "Password berhasil diganti! Silakan login kembali.",
+  });
 };
 
 exports.verifyOtp = async (req, res) => {
