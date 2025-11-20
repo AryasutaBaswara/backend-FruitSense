@@ -197,3 +197,48 @@ exports.resetPasswordFinal = async (req, res) => {
       .json({ error: "Reset gagal. Tautan kadaluarsa atau tidak valid." });
   }
 };
+
+exports.verifyOtp = async (req, res) => {
+  const { email, otp } = req.body;
+
+  // Basic validation
+  if (!email || !otp) {
+    return res.status(400).json({ error: "Email dan kode OTP wajib diisi." });
+  }
+  // simple email check
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    return res.status(400).json({ error: "Email tidak valid." });
+  }
+  // OTP format: 6 digit (sesuaikan jika berbeda)
+  if (!/^\d{6}$/.test(String(otp))) {
+    return res.status(400).json({ error: "Kode OTP harus 6 digit angka." });
+  }
+
+  try {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email: email,
+      token: String(otp),
+      type: "signup", // atau "recovery" jika untuk reset password
+    });
+
+    if (error) {
+      console.warn("Supabase verifyOtp failed:", error.message || error);
+      return res.status(400).json({ error: "Kode OTP salah atau kadaluarsa." });
+    }
+
+    // sukses: data.session dan data.user mungkin tersedia tergantung SDK/version
+    // Opsional: set cookie httpOnly dengan session.access_token untuk auto-login
+    // res.cookie('sb_token', data.session.access_token, { httpOnly: true, secure: true });
+
+    return res.status(200).json({
+      message: "Verifikasi berhasil.",
+      session: data?.session ?? null,
+      user: data?.user ?? null,
+    });
+  } catch (err) {
+    console.error("verifyOtp unexpected error:", err);
+    return res
+      .status(500)
+      .json({ error: "Terjadi kesalahan server saat verifikasi OTP." });
+  }
+};
