@@ -10,7 +10,7 @@ const analysisRoutes = require("./routes/analysisRoutes");
 
 // --- [BARU 1] Import Route Resep yang tadi kita buat ---
 // Pastikan kamu sudah punya file 'routes/recipeRoutes.js' ya
-const recipeRoutes = require("./routes/recipeRoutes"); 
+const recipeRoutes = require("./routes/recipeRoutes");
 
 const { startScheduler } = require("./services/notificationScheduler");
 
@@ -30,7 +30,6 @@ app.use("/api/v1/analyze", analysisRoutes);
 // --- [BARU 2] Pasang Jalur Resep di sini ---
 // Nanti Frontend aksesnya ke: http://localhost:8080/api/v1/recipes/saran
 app.use("/api/v1/recipes", recipeRoutes);
-
 
 // Route Bawaan
 app.get("/", (req, res) => {

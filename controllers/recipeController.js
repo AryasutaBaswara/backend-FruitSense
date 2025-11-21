@@ -1,5 +1,5 @@
 const supabase = require("../config/supabase");
-const recipeService = require("../services/recipeService");
+const recipeService = require("../services/aiservicegemini");
 
 // POST: Generate Recipe from Inventory Item
 exports.createRecipeFromInventory = async (req, res) => {
@@ -103,4 +103,38 @@ exports.getRecipeDetail = async (req, res) => {
   }
 
   res.status(200).json(data);
+};
+
+exports.deleteRecipe = async (req, res) => {
+  const userId = req.userId; // Dari Token JWT
+  const recipeId = req.params.id; // Dari URL
+
+  try {
+    // Lakukan penghapusan dengan filter ganda (id resep & id pemilik)
+    // Ini mencegah user A menghapus resep milik user B
+    const { error, count } = await supabase
+      .from("recipes")
+      .delete({ count: "exact" }) // Minta info berapa baris yang terhapus
+      .eq("id", recipeId)
+      .eq("user_id", userId);
+
+    if (error) {
+      console.error("Delete Recipe Error:", error.message);
+      return res.status(500).json({ error: "Gagal menghapus resep." });
+    }
+
+    // Jika count === 0, artinya resep tidak ditemukan atau bukan milik user ini
+    // (Karena filter .eq('user_id', userId) tidak cocok)
+    if (count === 0) {
+      return res
+        .status(404)
+        .json({
+          error: "Resep tidak ditemukan atau Anda tidak memiliki akses.",
+        });
+    }
+
+    res.status(200).json({ message: "Resep berhasil dihapus." });
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 };

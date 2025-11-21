@@ -16,5 +16,6 @@ router.get("/", recipeController.getMyRecipes);
 
 // GET: Ambil detail 1 resep
 router.get("/:id", recipeController.getRecipeDetail);
+router.delete("/:id", recipeController.deleteRecipe);
 
 module.exports = router;
