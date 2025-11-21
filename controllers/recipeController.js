@@ -1,48 +1,106 @@
-// controllers/recipeController.js
+const supabase = require("../config/supabase");
+const recipeService = require("../services/recipeService");
 
-const { generateRecipe } = require('../services/aiservicegemini');
+// POST: Generate Recipe from Inventory Item
+exports.createRecipeFromInventory = async (req, res) => {
+  const userId = req.userId;
+  const { inventory_id } = req.body;
 
-// Misal: Import model database (kalau sudah ada)
-// const InventoryModel = require('../models/Inventory');
+  if (!inventory_id) {
+    return res.status(400).json({ error: "Inventory ID wajib diisi." });
+  }
 
-exports.getRecommendation = async (req, res) => {
   try {
-    // --- LANGKAH 1: Ambil Data Inventory ---
-    // Nanti ganti ini dengan: const items = await InventoryModel.findAll({ where: { qty: > 0 } });
-    
-    // Contoh data dummy (Pura-puranya ini hasil dari Database)
-    const inventoryItems = [
-      "Apple (Grade A)", 
-      "Banana (Sisa 2 hari)", 
-      "Yoghurt", 
-      "Madu"
-    ];
+    // 1. Ambil Data Buah dari Inventory (Snapshot)
+    const { data: inventoryItem, error: fetchError } = await supabase
+      .from("inventories")
+      .select("fruit_name, image_url")
+      .eq("id", inventory_id)
+      .eq("user_id", userId)
+      .single();
 
-    // Cek kalau kosong
-    if (inventoryItems.length === 0) {
-      return res.status(400).json({
-        status: 'fail',
-        message: 'Inventory kosong. Masukkan buah dulu!'
-      });
+    if (fetchError || !inventoryItem) {
+      return res
+        .status(404)
+        .json({ error: "Buah tidak ditemukan di inventory." });
     }
 
-    // --- LANGKAH 2: Panggil AI Aurel ---
-    // Kita kirim list inventory ke fungsi yang baru kamu buat tadi
-    const resepSaran = await generateRecipe(inventoryItems);
+    // 2. Panggil AI Service (Gemini)
+    // Kita pakai nama buah dari inventory sebagai bahan utama
+    console.log(`Meminta resep untuk: ${inventoryItem.fruit_name}...`);
+    const aiRecipe = await recipeService.generateRecipe(
+      inventoryItem.fruit_name
+    );
 
-    // --- LANGKAH 3: Kirim Balasan ke Frontend ---
-    res.status(200).json({
-      status: 'success',
-      message: 'Resep berhasil dibuat oleh Chef Fruitsense',
-      data: resepSaran
+    // 3. Susun Data untuk Disimpan
+    const recipeData = {
+      user_id: userId,
+      inventory_id: inventory_id,
+
+      // Snapshot dari Inventory
+      fruit_name: inventoryItem.fruit_name,
+      fruit_image_url: inventoryItem.image_url,
+
+      // Data dari Gemini AI
+      title: aiRecipe.title,
+      ingredients: aiRecipe.ingredients,
+      instructions: aiRecipe.instructions,
+      cooking_time: aiRecipe.cooking_time,
+    };
+
+    // 4. Simpan ke Tabel Recipes
+    const { data: savedRecipe, error: insertError } = await supabase
+      .from("recipes")
+      .insert([recipeData])
+      .select()
+      .single();
+
+    if (insertError) throw insertError;
+
+    res.status(201).json({
+      message: "Resep berhasil dibuat!",
+      recipe: savedRecipe,
     });
-
   } catch (error) {
-    console.error("Error di Controller:", error);
-    res.status(500).json({
-      status: 'error',
-      message: 'Maaf, gagal membuat resep saat ini.',
-      error: error.message
-    });
+    console.error("Recipe Creation Error:", error.message);
+    return res
+      .status(500)
+      .json({ error: "Gagal membuat resep. Coba lagi nanti." });
   }
+};
+
+// GET: Ambil Daftar Resep User
+exports.getMyRecipes = async (req, res) => {
+  const userId = req.userId;
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.status(200).json(data);
+};
+
+// GET: Ambil Detail 1 Resep
+exports.getRecipeDetail = async (req, res) => {
+  const userId = req.userId;
+  const recipeId = req.params.id;
+
+  const { data, error } = await supabase
+    .from("recipes")
+    .select("*")
+    .eq("id", recipeId)
+    .eq("user_id", userId)
+    .single();
+
+  if (error) {
+    return res.status(404).json({ error: "Resep tidak ditemukan." });
+  }
+
+  res.status(200).json(data);
 };
