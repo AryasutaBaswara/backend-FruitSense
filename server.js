@@ -4,9 +4,10 @@ require("dotenv").config();
 const express = require("express");
 const authRoutes = require("./routes/authRoutes");
 const inventoryRoutes = require("./routes/inventoryRoutes");
-const userRoutes = require("./routes/userRoutes");
+// const userRoutes = require("./routes/userRoutes");
 const historyRoutes = require("./routes/historyRoutes");
 const analysisRoutes = require("./routes/analysisRoutes");
+const userProfileRoutes = require("./routes/userprofileRoutes");
 
 // --- [BARU 1] Import Route Resep yang tadi kita buat ---
 // Pastikan kamu sudah punya file 'routes/recipeRoutes.js' ya
@@ -23,9 +24,10 @@ app.use(express.json());
 // --- ROUTE UTAMA ---
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/inventory", inventoryRoutes);
-app.use("/api/v1/users", userRoutes);
+// app.use("/api/v1/users", userRoutes);
 app.use("/api/v1/history", historyRoutes);
 app.use("/api/v1/analyze", analysisRoutes);
+app.use("/api/v1/user-profile", userProfileRoutes);
 
 // --- [BARU 2] Pasang Jalur Resep di sini ---
 // Nanti Frontend aksesnya ke: http://localhost:8080/api/v1/recipes/saran
