@@ -97,29 +97,51 @@ exports.createInventory = async (req, res) => {
 exports.getInventories = async (req, res) => {
   const userId = req.userId;
 
-  const { data, error } = await supabase
-    .from("inventories")
-    .select("*")
-    .eq("user_id", userId)
-    .order("expiration_date", { ascending: true });
+  const { search, sortBy } = req.query;
 
-  if (error) {
-    console.error("Supabase Fetch Error: ", error);
-    return res
-      .status(500)
-      .json({ error: "Failed to fetch data from inventory." });
+  try {
+    // 1. Mulai Query Dasar
+    let query = supabase.from("inventories").select("*").eq("user_id", userId);
+    // 2. Tambahkan Filter Search (Jika ada)
+    if (search) {
+      // ilike = Case insensitive search (Apel = apel = APEL)
+      // %search% artinya mencari teks yang mengandung kata tersebut
+      query = query.ilike("fruit_name", `%${search}%`);
+    }
+    // 3. Tambahkan Sorting (Jika ada)
+    if (sortBy === "newest") {
+      // Urutkan berdasarkan waktu upload (terbaru di atas)
+      query = query.order("created_at", { ascending: false });
+    } else if (sortBy === "stock") {
+      // Urutkan berdasarkan jumlah stok (terbanyak di atas)
+      query = query.order("stock_quantity", { ascending: false });
+    } else {
+      // DEFAULT: Urutkan berdasarkan Tanggal Busuk (yang mau busuk paling atas)
+      // Ini paling penting buat aplikasi food waste!
+      query = query.order("expiration_date", { ascending: true });
+    }
+    // 4. Eksekusi Query
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Supabase Fetch Error: ", error);
+      return res
+        .status(500)
+        .json({ error: "Failed to fetch data from inventory." });
+    }
+
+    const processedData = data.map((item) => {
+      const daysLeft = calculateDaysUntilExpired(item.expiration_date);
+
+      return {
+        ...item,
+        days_until_expired: daysLeft,
+      };
+    });
+    res.status(200).json(processedData);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
-
-  const processedData = data.map((item) => {
-    const daysLeft = calculateDaysUntilExpired(item.expiration_date);
-
-    return {
-      ...item,
-      days_until_expired: daysLeft,
-    };
-  });
-
-  res.status(200).json(processedData);
 };
 
 exports.updateInventory = async (req, res) => {
