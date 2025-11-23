@@ -1,10 +1,13 @@
+// routes/fcmRoutes.js
 const express = require("express");
 const router = express.Router();
-const userController = require("../controllers/fcmController");
+const fcmController = require("../controllers/fcmController");
 const { verifyToken } = require("../middleware/auth");
 
-router.use(verifyToken);
+// Endpoint simpan token butuh login
+router.put("/token", verifyToken, fcmController.storeToken);
 
-router.put("/fcm-token", userController.updateFcmToken);
+// Endpoint test manual (Bisa dimatikan nanti di production)
+router.post("/test-send", fcmController.testNotification);
 
 module.exports = router;

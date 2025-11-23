@@ -8,7 +8,7 @@ const inventoryRoutes = require("./routes/inventoryRoutes");
 const historyRoutes = require("./routes/historyRoutes");
 const analysisRoutes = require("./routes/analysisRoutes");
 const userProfileRoutes = require("./routes/userprofileRoutes");
-
+const fcmRoutes = require("./routes/fcmRoutes");
 // --- [BARU 1] Import Route Resep yang tadi kita buat ---
 // Pastikan kamu sudah punya file 'routes/recipeRoutes.js' ya
 const recipeRoutes = require("./routes/recipeRoutes");
@@ -28,10 +28,8 @@ app.use("/api/v1/inventory", inventoryRoutes);
 app.use("/api/v1/history", historyRoutes);
 app.use("/api/v1/analyze", analysisRoutes);
 app.use("/api/v1/user-profile", userProfileRoutes);
-
-// --- [BARU 2] Pasang Jalur Resep di sini ---
-// Nanti Frontend aksesnya ke: http://localhost:8080/api/v1/recipes/saran
 app.use("/api/v1/recipes", recipeRoutes);
+app.use("/api/v1/fcm", fcmRoutes);
 
 // Route Bawaan
 app.get("/", (req, res) => {
