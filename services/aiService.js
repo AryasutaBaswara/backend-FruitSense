@@ -2,7 +2,8 @@ const axios = require("axios");
 const formData = require("form-data");
 const dayjs = require("dayjs");
 
-const ML_SERVER_URL = "http://localhost:5001/analyze";
+const ML_SERVER_URL =
+  process.env.ML_SERVER_URL || "http://localhost:5001/analyze";
 
 const FRUIT_NUTRIENTS = {
   Apple: "Vitamin C, Fiber, Potassium, Antioxidants",
