@@ -13,6 +13,9 @@ const fcmRoutes = require("./routes/fcmRoutes");
 // Pastikan kamu sudah punya file 'routes/recipeRoutes.js' ya
 const recipeRoutes = require("./routes/recipeRoutes");
 
+const swaggerUi = require("swagger-ui-express");
+const swaggerSpecs = require("./swaggerConfig");
+
 const { startScheduler } = require("./services/notificationScheduler");
 
 const app = express();
@@ -31,24 +34,7 @@ app.use("/api/v1/user-profile", userProfileRoutes);
 app.use("/api/v1/recipes", recipeRoutes);
 app.use("/api/v1/fcm", fcmRoutes);
 
-// Route Bawaan
-app.get("/", (req, res) => {
-  // Kirim pesan konfirmasi yang jelas
-  res.send(
-    "<h1>Verifikasi Sukses!</h1><p>Akun Anda telah diaktifkan. Silakan kembali ke aplikasi mobile.</p>"
-  );
-});
-
-app.get("/reset-password", (req, res) => {
-  // Saat user mengklik link di email, token dikirim via URL query.
-  const resetUrl = req.protocol + "://" + req.get("host") + req.originalUrl;
-
-  res.send(`
-        <h1>Landing Page Reset Password (Simulasi)</h1>
-        <p>Token sudah ada di URL. Silakan salin URL di address bar dan lanjutkan di Postman.</p>
-        <p>Token Anda: <strong>${req.query.access_token}</strong></p>
-    `);
-});
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 
 // SERVER RUNNING
 app.listen(port, () => {
