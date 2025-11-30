@@ -45,6 +45,14 @@ exports.analyzeAndSave = async (req, res) => {
     );
     console.log("✅ Hasil Analisis:", aiResult.summary);
 
+    if (aiResult.is_valid === false) {
+      console.warn("❌ Gambar ditolak:", aiResult.summary);
+      return res.status(400).json({
+        error: "Gambar tidak dikenali atau buah tidak didukung.",
+        details: aiResult.summary,
+      });
+    }
+
     // --- LANGKAH 4: UPLOAD GAMBAR KE SUPABASE ---
     const { error: uploadError } = await supabase.storage
       .from(bucketName)

@@ -43,6 +43,14 @@ exports.predictImage = async (imageFile) => {
  */
 
 exports.processLabels = async (predictedFruit, predictedGradeLabel) => {
+  // 🛑 CEK 1: Apakah Python bilang "Unknown"? (Confidence rendah)
+  if (!predictedFruit || predictedFruit === "Unknown") {
+    return {
+      is_valid: false, // Tanda untuk Controller: JANGAN SIMPAN
+      summary: "Objek tidak dikenali atau bukan buah yang didukung.",
+    };
+  }
+
   const pFruit = predictedFruit.toLowerCase();
   const pGrade = predictedGradeLabel.toLowerCase();
 
@@ -63,7 +71,6 @@ exports.processLabels = async (predictedFruit, predictedGradeLabel) => {
   else if (pGrade.includes("papaya")) finalFruitName = "Papaya";
 
   // Fallback standarisasi jika tidak ada konflik
-
   if (finalFruitName.toLowerCase() === "banana") finalFruitName = "Banana";
   if (finalFruitName.toLowerCase() === "apple") finalFruitName = "Apple";
   if (finalFruitName.toLowerCase() === "guava") finalFruitName = "Guava";
@@ -78,6 +85,15 @@ exports.processLabels = async (predictedFruit, predictedGradeLabel) => {
   if (finalFruitName.toLowerCase() === "pineapple")
     finalFruitName = "Pineapple";
   if (finalFruitName.toLowerCase() === "papaya") finalFruitName = "Papaya";
+
+  const isSupported = SUPPORTED_FRUITS.includes(finalFruitName);
+
+  if (!isSupported) {
+    return {
+      is_valid: false, // Tanda untuk Controller: JANGAN SIMPAN
+      summary: `Maaf, buah '${finalFruitName}' belum didukung oleh sistem.`,
+    };
+  }
 
   const finalNutrients =
     FRUIT_NUTRIENTS[finalFruitName] || "Vitamins, Fiber, Minerals";
