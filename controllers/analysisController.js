@@ -41,7 +41,8 @@ exports.analyzeAndSave = async (req, res) => {
     // Ini akan memperbaiki nama buah (misal Jambu -> Pisang) dan ambil nutrisinya
     const aiResult = await aiService.processLabels(
       rawAI.predicted_fruit_name,
-      rawAI.predicted_grade_label
+      rawAI.predicted_grade_label,
+      rawAI.confidence
     );
     console.log("✅ Hasil Analisis:", aiResult.summary);
 

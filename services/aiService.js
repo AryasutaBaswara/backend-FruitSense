@@ -56,13 +56,24 @@ exports.predictImage = async (imageFile) => {
  * Di sinilah kita memperbaiki kesalahan AI
  */
 
-exports.processLabels = async (predictedFruit, predictedGradeLabel) => {
+exports.processLabels = async (
+  predictedFruit,
+  predictedGradeLabel,
+  confidence
+) => {
   // 🛑 CEK 1: Apakah Python bilang "Unknown"? (Confidence rendah)
-  console.log("------------------------------------------------");
-  console.log("🔍 DEBUG AI SERVICE:");
-  console.log("👉 Raw Fruit from Python:", predictedFruit);
-  console.log("👉 Raw Grade from Python:", predictedGradeLabel);
-  console.log("------------------------------------------------");
+  console.log(
+    `🔍 AI Result -> Fruit: ${predictedFruit}, Grade: ${predictedGradeLabel}, Confidence: ${confidence}`
+  );
+
+  if (confidence < 0.45) {
+    return {
+      is_valid: false,
+      summary: `Objek kurang jelas (Keyakinan AI hanya ${(
+        confidence * 100
+      ).toFixed(0)}%). Pastikan foto buah terlihat jelas dan dekat.`,
+    };
+  }
 
   if (!predictedFruit || predictedFruit === "Unknown") {
     return {
@@ -139,6 +150,7 @@ exports.processLabels = async (predictedFruit, predictedGradeLabel) => {
   if (finalGrade.includes("Rotten")) expirationDays = 0;
 
   return {
+    is_valid: true,
     fruit_name: finalFruitName,
     grade: finalGrade,
     nutrients: finalNutrients,
