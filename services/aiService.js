@@ -5,6 +5,20 @@ const dayjs = require("dayjs");
 const ML_SERVER_URL =
   process.env.ML_SERVER_URL || "http://localhost:5001/analyze";
 
+const SUPPORTED_FRUITS = [
+  "Apple",
+  "Banana",
+  "Durian",
+  "Grape",
+  "Guava",
+  "Jackfruit",
+  "Mango",
+  "Orange",
+  "Papaya",
+  "Pineapple",
+  "Watermelon",
+];
+
 const FRUIT_NUTRIENTS = {
   Apple: "Vitamin C, Fiber, Potassium, Antioxidants",
   Banana: "Potassium, Vitamin B6, Vitamin C, Magnesium",
@@ -44,6 +58,12 @@ exports.predictImage = async (imageFile) => {
 
 exports.processLabels = async (predictedFruit, predictedGradeLabel) => {
   // 🛑 CEK 1: Apakah Python bilang "Unknown"? (Confidence rendah)
+  console.log("------------------------------------------------");
+  console.log("🔍 DEBUG AI SERVICE:");
+  console.log("👉 Raw Fruit from Python:", predictedFruit);
+  console.log("👉 Raw Grade from Python:", predictedGradeLabel);
+  console.log("------------------------------------------------");
+
   if (!predictedFruit || predictedFruit === "Unknown") {
     return {
       is_valid: false, // Tanda untuk Controller: JANGAN SIMPAN
