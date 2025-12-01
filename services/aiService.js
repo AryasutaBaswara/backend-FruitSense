@@ -2,8 +2,13 @@ const axios = require("axios");
 const formData = require("form-data");
 const dayjs = require("dayjs");
 
+const { GoogleGenerativeAI } = require("@google/generative-ai");
+
 const ML_SERVER_URL =
   process.env.ML_SERVER_URL || "http://localhost:5001/analyze";
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_VISION_API_KEY);
+const geminiModel = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 const SUPPORTED_FRUITS = [
   "Apple",
@@ -32,6 +37,65 @@ const FRUIT_NUTRIENTS = {
   Pineapple: "Vitamin C, Manganese, Bromelain (Enzyme)",
   Watermelon: "Vitamin A, Vitamin C, Lycopene, Hydration (92% Water)",
 };
+
+// --- HELPER GEMINI ---
+function fileToGenerativePart(buffer, mimeType) {
+  return {
+    inlineData: {
+      data: buffer.toString("base64"),
+      mimeType,
+    },
+  };
+}
+
+// --- FUNGSI TANYA GEMINI ---
+const askGeminiVision = async (imageBuffer, mimeType) => {
+  console.log("🤖 Mengaktifkan Mode Dewa (Gemini Vision)...");
+  const prompt = `Peran kamu adalah Ahli Kualitas Buah (Fruit Grader) yang SANGAT KRITIS dan TELITI.
+    Analisis gambar ini untuk menentukan jenis buah dan kualitasnya.
+    
+    Output JSON Murni:
+    {
+        "fruit_name": "Nama Buah (English)",
+        "grade": "Grade A/Grade B/Grade C/Rotten"
+    }
+    
+    KRITERIA GRADING (WAJIB PATUH):
+    1. Grade A (Perfect): 
+       - Kulit mulus 100%, warna cerah merata.
+       - TIDAK ADA bintik, goresan, atau kerutan sedikitpun.
+       - Bentuk simetris sempurna.
+    
+    2. Grade B (Good/Ripe):
+       - Masih layak makan tapi tidak sempurna.
+       - Ada SEDIKIT bintik kecil, warna tidak rata, atau goresan halus.
+    
+    3. Grade C (Poor/Old):
+       - Terlihat layu, kulit mulai keriput/lembek.
+       - Ada memar (bruise), bintik hitam yang jelas, atau noda besar.
+       - Warna kusam/pucat.
+       - JIKA RAGU ANTARA B DAN C, PILIH C.
+    
+    4. Rotten (Busuk):
+       - Ada JAMUR (putih/abu-abu), hancur, berair, atau noda hitam busuk yang parah.
+    
+    Jika bukan buah, fruit_name="Unknown".`;
+
+  try {
+    const imagePart = fileToGenerativePart(imageBuffer, mimeType);
+    const result = await geminiModel.generateContent([prompt, imagePart]);
+    const text = result.response
+      .text()
+      .replace(/```json/g, "")
+      .replace(/```/g, "")
+      .trim();
+    return JSON.parse(text);
+  } catch (e) {
+    console.error("Gemini Error:", e.message);
+    return null;
+  }
+};
+
 /**
  * FUNGSI 1: Kirim Gambar ke Python
  * Tugasnya cuma jadi kurir: Kirim gambar -> Terima JSON mentah
@@ -59,34 +123,56 @@ exports.predictImage = async (imageFile) => {
 exports.processLabels = async (
   predictedFruit,
   predictedGradeLabel,
-  confidence
+  confidence,
+  imageBuffer,
+  mimeType
 ) => {
   // 🛑 CEK 1: Apakah Python bilang "Unknown"? (Confidence rendah)
   console.log(
     `🔍 AI Result -> Fruit: ${predictedFruit}, Grade: ${predictedGradeLabel}, Confidence: ${confidence}`
   );
 
-  if (confidence < 0.45) {
-    return {
-      is_valid: false,
-      summary: `Objek kurang jelas (Keyakinan AI hanya ${(
-        confidence * 100
-      ).toFixed(0)}%). Pastikan foto buah terlihat jelas dan dekat.`,
-    };
+  let finalFruitName = predictedFruit;
+  let finalGrade = predictedGradeLabel || "";
+  let source = "Local Model";
+  // Default string kosong biar aman
+
+  if (
+    true ||
+    confidence < 0.6 ||
+    !predictedFruit ||
+    predictedFruit === "Unknown"
+  ) {
+    // Panggil Gemini
+    const geminiResult = await askGeminiVision(imageBuffer, mimeType);
+
+    if (geminiResult && geminiResult.fruit_name !== "Unknown") {
+      console.log("✨ Gemini menyelamatkan hari!", geminiResult);
+
+      // Override hasil Python dengan hasil Gemini
+      finalFruitName = geminiResult.fruit_name;
+      // Mapping grade Gemini ke format kita (biar masuk if-else di bawah)
+      let gGrade = (geminiResult.grade || "").toLowerCase();
+      if (gGrade.includes("grade a")) finalGrade = "grade_a";
+      else if (gGrade.includes("grade b")) finalGrade = "grade_b";
+      else if (gGrade.includes("grade c")) finalGrade = "grade_c";
+      else if (gGrade.includes("rotten")) finalGrade = "rotten";
+      else finalGrade = gGrade; // Fallback
+    } else {
+      // Kalau Gemini juga nyerah, baru kita return Invalid
+      return {
+        is_valid: false,
+        summary: `Objek tidak dikenali (Python: ${(confidence * 100).toFixed(
+          0
+        )}%, Gemini: Gagal).`,
+      };
+    }
   }
 
-  if (!predictedFruit || predictedFruit === "Unknown") {
-    return {
-      is_valid: false, // Tanda untuk Controller: JANGAN SIMPAN
-      summary: "Objek tidak dikenali atau bukan buah yang didukung.",
-    };
-  }
+  const pFruit = (finalFruitName || "").toLowerCase();
+  const pGrade = (finalGrade || "").toLowerCase();
 
-  const pFruit = predictedFruit.toLowerCase();
-  const pGrade = predictedGradeLabel.toLowerCase();
-
-  let finalFruitName = pFruit;
-  let finalGrade = "unknown";
+  finalFruitName = pFruit.charAt(0).toUpperCase() + pFruit.slice(1);
   let baseDays = 3;
 
   if (pGrade.includes("banana")) finalFruitName = "Banana";
@@ -118,10 +204,9 @@ exports.processLabels = async (
   if (finalFruitName.toLowerCase() === "papaya") finalFruitName = "Papaya";
 
   const isSupported = SUPPORTED_FRUITS.includes(finalFruitName);
-
   if (!isSupported) {
     return {
-      is_valid: false, // Tanda untuk Controller: JANGAN SIMPAN
+      is_valid: false,
       summary: `Maaf, buah '${finalFruitName}' belum didukung oleh sistem.`,
     };
   }
@@ -141,6 +226,10 @@ exports.processLabels = async (
   } else if (pGrade.includes("rotten") || pGrade.includes("busuk")) {
     baseDays = 0;
     finalGrade = "Rotten ";
+  } else {
+    // Jika grade tidak dikenali (misal dari Gemini formatnya beda), default ke B
+    baseDays = 3;
+    finalGrade = finalGrade || "Unknown Grade";
   }
 
   const variance = Math.floor(Math.random() * 3) - 1;

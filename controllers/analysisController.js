@@ -42,7 +42,9 @@ exports.analyzeAndSave = async (req, res) => {
     const aiResult = await aiService.processLabels(
       rawAI.predicted_fruit_name,
       rawAI.predicted_grade_label,
-      rawAI.confidence
+      rawAI.confidence,
+      imageFile.buffer, // <-- Tambahan Parameter 4
+      imageFile.mimetype
     );
     console.log("✅ Hasil Analisis:", aiResult.summary);
 
@@ -102,7 +104,6 @@ exports.analyzeAndSave = async (req, res) => {
       .select("*");
 
     if (inventoryError) throw new Error("Gagal menyimpan inventory.");
-
     // --- RESPONSE SUKSES ---
     res.status(201).json({
       message: "Analisis Berhasil! Data disimpan.",
