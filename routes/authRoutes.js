@@ -181,4 +181,8 @@ router.post("/verify-recovery", authController.verifyRecovery);
  */
 router.put("/reset-password", verifyToken, authController.resetPasswordFinal);
 
+router.post("/resend-otp", authController.resendOtp);
+
+router.post("/resend-recovery-otp", authController.resendRecoveryOtp);
+
 module.exports = router;

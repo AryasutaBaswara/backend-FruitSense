@@ -229,3 +229,71 @@ exports.verifyOtp = async (req, res) => {
       .json({ error: "Terjadi kesalahan server saat verifikasi OTP." });
   }
 };
+
+exports.resendOtp = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email wajib diisi." });
+  }
+
+  try {
+    // Panggil fungsi resend khusus Supabase
+    const { error } = await supabase.auth.resend({
+      type: "signup", // Tipe verifikasi: pendaftaran
+      email: email,
+    });
+
+    if (error) {
+      // Supabase membatasi pengiriman (biasanya 60 detik sekali)
+      // Error: "Signups not allowed for this instance" atau Rate Limit
+      console.error("Resend OTP Error:", error.message);
+      return res.status(400).json({
+        error:
+          "Gagal mengirim ulang. Tunggu beberapa saat (60 detik) sebelum mencoba lagi.",
+      });
+    }
+
+    res.status(200).json({
+      message: "Kode OTP baru telah dikirim ke email Anda.",
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
+
+exports.resendRecoveryOtp = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: "Email wajib diisi." });
+  }
+
+  try {
+    // Untuk recovery, kita panggil resetPasswordForEmail lagi.
+    // Ini akan memicu pengiriman email OTP baru.
+    const { error } = await supabase.auth.resetPasswordForEmail(email);
+
+    if (error) {
+      console.error("Resend Recovery Error:", error.message);
+
+      // Handle Rate Limit (Terlalu sering minta kode)
+      if (error.message.includes("security purposes")) {
+        return res.status(429).json({
+          error:
+            "Terlalu banyak permintaan. Mohon tunggu 60 detik sebelum meminta kode lagi.",
+        });
+      }
+
+      return res
+        .status(500)
+        .json({ error: "Gagal mengirim ulang kode pemulihan." });
+    }
+
+    res.status(200).json({
+      message: "Kode OTP pemulihan password telah dikirim ulang ke email Anda.",
+    });
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+};
