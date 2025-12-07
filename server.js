@@ -20,7 +20,7 @@ const swaggerSpecs = require("./swaggerConfig");
 const { startScheduler } = require("./services/notificationScheduler");
 
 const app = express();
-const port = 8080;
+const port = 3000;
 
 // Middleware untuk membaca JSON dari body request
 app.use(express.json());
@@ -36,6 +36,10 @@ app.use("/api/v1/recipes", recipeRoutes);
 app.use("/api/v1/fcm", fcmRoutes);
 
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
+
+app.get('/', (req, res) => {
+    res.send('Backend FruitSense Berjalan di Port 3000!');
+});
 
 // SERVER RUNNING
 app.listen(port, () => {
