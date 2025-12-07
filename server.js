@@ -39,5 +39,6 @@ app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpecs));
 // SERVER RUNNING
 app.listen(port, () => {
   console.log(`Server Express berjalan di http://localhost:${port}`);
+  console.log("CI/CD test berjalan");
   startScheduler();
 });
