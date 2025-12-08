@@ -62,10 +62,10 @@ exports.updateProfile = async (req, res) => {
       const bucketName = "fruit-images"; // Kita pakai bucket yg sama biar praktis
       const fileExtension = imageFile.originalname.split(".").pop();
       // Simpan di folder khusus 'avatars/' biar rapi
-      const filePath = `avatars/${userId}/$${require("uuid").v4()}.${fileExtension}`;
+      const filePath = `avatars/${userId}/${require("uuid").v4()}.${fileExtension}`;
 
       // 1. Upload ke Storage
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from(bucketName)
         .upload(filePath, imageFile.buffer, {
           contentType: imageFile.mimetype,
