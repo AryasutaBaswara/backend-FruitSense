@@ -44,6 +44,5 @@ app.get('/', (req, res) => {
 // SERVER RUNNING
 app.listen(port, () => {
   console.log(`Server Express berjalan di http://localhost:${port}`);
-  console.log("CI/CD test continuous trigger");
   startScheduler();
 });
