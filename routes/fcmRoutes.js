@@ -94,6 +94,6 @@ router.put("/save-token", verifyToken, fcmController.saveFcmToken);
  *                   type: object
  *                   description: Detail response dari Firebase
  */
-router.post("/test-send", fcmController.testSend);
+router.post("/test-send", verifyToken, fcmController.testSend);
 
 module.exports = router;
