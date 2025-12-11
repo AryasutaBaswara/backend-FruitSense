@@ -2,58 +2,75 @@
 const cron = require("node-cron");
 const dayjs = require("dayjs");
 const supabase = require("../config/supabase");
-const { sendNotification } = require("./fcmService"); // Panggil service pengirim
+const { sendNotification } = require("./fcmService"); // Pastikan file ini ada
 
-// Logika inti untuk mencari buah yang mendekati busuk (misalnya, <= 3 hari)
 const checkExpiredFruits = async () => {
-  // 1. Tentukan tanggal batas: 3 hari dari sekarang (YYYY-MM-DD)
+  // 1. Tanggal batas: 3 hari dari sekarang
   const threeDaysFromNow = dayjs().add(3, "day").format("YYYY-MM-DD");
+  // 2. Tanggal hari ini (agar tidak ambil yg sudah busuk bulan lalu)
+  const today = dayjs().format("YYYY-MM-DD");
 
-  // 2. Query data (JOIN inventories dan users untuk mendapatkan FCM token)
+  console.log(
+    `⏰ [CRON] Mengecek buah exp antara ${today} s/d ${threeDaysFromNow}`
+  );
+
+  // 3. Query: Ambil yg exp <= 3 hari DAN exp >= hari ini
   const { data: inventories, error } = await supabase
     .from("inventories")
-    // Gunakan PostgREST JOIN untuk mengambil kolom fcm_token dari tabel users
     .select(
       `
-            fruit_name, expiration_date, stock_quantity,
-            users (fcm_token)
+            id, fruit_name, expiration_date, stock_quantity,
+            users!inner (fcm_token)
         `
     )
-    .lte("expiration_date", threeDaysFromNow) // <= 3 hari dari sekarang
-    .neq("stock_quantity", 0); // Hanya jika stok tidak nol
+    .lte("expiration_date", threeDaysFromNow) // Kurang dari sama dengan H+3
+    .gte("expiration_date", today) // Lebih dari sama dengan Hari Ini
+    .neq("stock_quantity", 0);
 
   if (error) {
-    console.error("CRON Job Query Error:", error);
+    console.error("❌ CRON Query Error:", error.message);
     return;
   }
 
-  // 3. Proses dan Kirim Notifikasi
+  // 4. Kirim Notif
   if (inventories && inventories.length > 0) {
-    console.log(`\n[CRON] Ditemukan ${inventories.length} item kritis.`);
+    console.log(`\n🚨 [CRON] Ditemukan ${inventories.length} item kritis.`);
 
     for (const item of inventories) {
-      const fcmToken = item.users ? item.users.fcm_token : null;
-      const daysLeft = dayjs(item.expiration_date).diff(dayjs(), "days");
+      // Handle jika users berupa array atau object
+      const fcmToken = Array.isArray(item.users)
+        ? item.users[0]?.fcm_token
+        : item.users?.fcm_token;
 
-      // Hanya kirim jika token ada dan buah belum busuk (>= 0 hari)
-      if (fcmToken && daysLeft >= 0) {
+      if (fcmToken) {
+        const daysLeft = dayjs(item.expiration_date).diff(dayjs(), "days");
+
+        console.log(
+          `🚀 Kirim notif: ${item.fruit_name} (Sisa ${daysLeft} hari)`
+        );
+
         const messageTitle = `🚨 Buah Segera Busuk: ${item.fruit_name}`;
-        const messageBody = `Stok ${item.stock_quantity} akan busuk dalam ${daysLeft} hari. Segera dikonsumsi!`;
+        const messageBody = `Stok ${item.stock_quantity} ${item.fruit_name} kamu akan busuk dalam ${daysLeft} hari. Segera habiskan!`;
 
-        sendNotification(fcmToken, messageTitle, messageBody);
+        // Panggil helper FCM
+        await sendNotification(fcmToken, messageTitle, messageBody);
       }
     }
+  } else {
+    console.log(
+      "✅ [CRON] Aman. Tidak ada buah yang mau busuk dalam 3 hari ini."
+    );
   }
 };
 
-// Jadwal: Setiap hari pada pukul 08:00 dan 20:00 WIB
 exports.startScheduler = () => {
-  // Jalankan satu kali saat server start untuk testing dan kemudian jalankan sesuai jadwal
+  // Jalankan sekali saat server start (biar kelihatan log-nya)
   checkExpiredFruits();
 
+  // Jadwal: 08:00 dan 20:00 WIB
   cron.schedule("0 8,20 * * *", checkExpiredFruits, {
     scheduled: true,
-    timezone: "Asia/Jakarta", // Zona Waktu Indonesia Barat
+    timezone: "Asia/Jakarta",
   });
-  console.log("Scheduler buah busuk telah dimulai dan diuji.");
+  console.log("✅ Scheduler buah busuk aktif (08:00 & 20:00 WIB).");
 };

@@ -15,7 +15,7 @@ const { verifyToken } = require("../middleware/auth");
 //
 /**
  * @swagger
- * /api/v1/fcm/token:
+ * /api/v1/fcm/save-token:
  *   put:
  *     summary: Simpan FCM Token dari perangkat user ke database
  *     description: Frontend wajib memanggil ini setiap kali user login agar notifikasi bisa terkirim.
@@ -52,7 +52,7 @@ const { verifyToken } = require("../middleware/auth");
  *       400:
  *         description: Token kosong
  */
-router.put("/token", verifyToken, fcmController.storeToken);
+router.put("/save-token", verifyToken, fcmController.saveFcmToken);
 
 // --- 2. TEST SEND (POST) ---
 //
@@ -94,6 +94,6 @@ router.put("/token", verifyToken, fcmController.storeToken);
  *                   type: object
  *                   description: Detail response dari Firebase
  */
-router.post("/test-send", fcmController.testNotification);
+router.post("/test-send", fcmController.testSend);
 
 module.exports = router;

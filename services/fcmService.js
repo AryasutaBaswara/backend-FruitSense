@@ -25,6 +25,8 @@ if (!admin.apps.length && serviceAccount) {
 }
 
 exports.sendNotification = async (token, title, body) => {
+  if (!token) return;
+
   const message = {
     notification: { title, body },
     token: token,

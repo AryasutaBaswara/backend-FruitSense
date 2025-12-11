@@ -104,6 +104,7 @@ exports.analyzeAndSave = async (req, res) => {
       .select("*");
 
     if (inventoryError) throw new Error("Gagal menyimpan inventory.");
+
     // --- RESPONSE SUKSES ---
     res.status(201).json({
       message: "Analisis Berhasil! Data disimpan.",
