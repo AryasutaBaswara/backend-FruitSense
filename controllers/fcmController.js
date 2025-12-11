@@ -33,23 +33,46 @@ exports.saveFcmToken = async (req, res) => {
 // 2. Test Manual (Opsional)
 exports.testSend = async (req, res) => {
   const userId = req.userId;
+  console.log("\n--- 🕵️‍♂️ DEBUGGING NOTIFIKASI ---");
+  console.log("🔑 ID dari Token Login:", userId);
 
-  // Ambil token user dari DB
-  const { data } = await supabase
-    .from("users")
-    .select("fcm_token")
-    .eq("id", userId)
-    .single();
+  // Cek apakah ID ini cocok dengan Marcelino (998a3...)
 
-  if (!data?.fcm_token)
-    return res.status(404).json({ error: "User belum punya token" });
+  try {
+    // Kita select semua kolom biar kelihatan apa yang didapat
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .eq("id", userId)
+      .single();
 
-  // Panggil Service kamu
-  const result = await fcmService.sendNotification(
-    data.fcm_token,
-    "Tes Notifikasi",
-    "Ini adalah pesan percobaan dari server."
-  );
+    if (error) {
+      console.error("❌ Error Query Supabase:", error);
+      return res.status(500).json({ error: "Database Error", details: error });
+    }
 
-  res.json(result);
+    console.log("📦 Data User Ditemukan:", data ? "ADA" : "KOSONG");
+    console.log("📱 FCM Token di DB:", data?.fcm_token);
+
+    if (!data?.fcm_token) {
+      console.log("⚠️ Masalah: Token NULL atau Kosong");
+      return res.status(404).json({
+        error: "User belum punya token",
+        debug_id: userId,
+        db_token_status: data?.fcm_token ? "Ada" : "NULL",
+      });
+    }
+
+    // Lanjut kirim...
+    const result = await fcmService.sendNotification(
+      data.fcm_token,
+      "Tes Notifikasi",
+      "Ini pesan debugging dari server."
+    );
+
+    res.json(result);
+  } catch (err) {
+    console.error("🔥 Crash:", err.message);
+    res.status(500).json({ error: err.message });
+  }
 };
